@@ -74,7 +74,7 @@ jobs:
           CC: ${{ matrix.compiler }}
         working-directory: ${{ runner.temp }}
 
-      # Setup and use a suitable ARM GCC for the firwmare
+      # Setup and use a suitable ARM GCC for the firmware
       - name: Setup ARM GCC
         uses: numworks/setup-arm-toolchain@2020-q4
 
@@ -208,12 +208,12 @@ jobs:
     steps:
       - uses: numworks/setup-arm-toolchain@2020-q4
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           ref: ${{ github.base_ref }}
           path: base
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           path: head
