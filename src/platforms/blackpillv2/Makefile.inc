@@ -6,9 +6,9 @@ OBJCOPY = $(CROSS_COMPILE)objcopy
 CFLAGS += -Istm32/include -mcpu=cortex-m4 -mthumb \
 	-mfloat-abi=hard -mfpu=fpv4-sp-d16 \
 	-DSTM32F4 -I../libopencm3/include \
-	-Iplatforms/stm32
+	-Iplatforms/common/stm32
 
-LINKER_SCRIPT=platforms/stm32/blackpillv2.ld
+LINKER_SCRIPT=platforms/blackpillv2/blackpillv2.ld
 
 LDFLAGS_BOOT = -lopencm3_stm32f4 \
 	-Wl,-T,$(LINKER_SCRIPT) -nostartfiles -lc -lnosys \
@@ -25,7 +25,11 @@ LDFLAGS += $(LDFLAGS_BOOT)
 CFLAGS += -DDFU_SERIAL_LENGTH=13
 endif
 
-VPATH += platforms/stm32
+ifdef ALTERNATIVE_PINOUT
+CFLAGS += -DALTERNATIVE_PINOUT=$(ALTERNATIVE_PINOUT)
+endif
+
+VPATH += platforms/common/stm32
 
 SRC +=               \
 	traceswodecode.c \

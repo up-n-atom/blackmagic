@@ -82,12 +82,6 @@ typedef struct stlink {
 #define STLINK_V2_MAX_SWD_CLOCK_FREQ  (3600U * 1000U)
 #define STLINK_V2_MIN_SWD_CLOCK_FREQ  (4505U)
 
-#ifdef __GNUC__
-#define unlikely(x) __builtin_expect(x, 0)
-#else
-#define unlikely(x) x
-#endif
-
 static stlink_s stlink;
 
 static uint32_t stlink_v2_divisor;
@@ -410,55 +404,12 @@ bool stlink_init(void)
 		return false;
 	info.usb_link = link;
 	link->context = info.libusb_ctx;
-	libusb_device **devs = NULL;
-	const ssize_t cnt = libusb_get_device_list(info.libusb_ctx, &devs);
-	if (cnt < 0) {
-		DEBUG_ERROR("FATAL: ST-Link libusb_get_device_list failed\n");
+	int result = libusb_open(info.libusb_dev, &link->device_handle);
+	if (result != LIBUSB_SUCCESS) {
+		DEBUG_ERROR("libusb_open() failed (%d): %s\n", result, libusb_error_name(result));
+		DEBUG_WARN("Are you sure the permissions on the device are set correctly?\n");
 		return false;
 	}
-	bool found = false;
-	for (size_t i = 0; devs[i]; ++i) {
-		libusb_device *dev = devs[i];
-		struct libusb_device_descriptor desc;
-		int result = libusb_get_device_descriptor(dev, &desc);
-		if (result != LIBUSB_SUCCESS) {
-			DEBUG_ERROR("libusb_get_device_descriptor failed %s\n", libusb_strerror(result));
-			return false;
-		}
-		if (desc.idVendor != info.vid || desc.idProduct != info.pid)
-			continue;
-
-		result = libusb_open(dev, &link->device_handle);
-		if (result != LIBUSB_SUCCESS) {
-			DEBUG_ERROR("Failed to open ST-Link device %04x:%04x - %s\n", desc.idVendor, desc.idProduct,
-				libusb_strerror(result));
-			DEBUG_WARN("Are you sure the permissions on the device are set correctly?\n");
-			continue;
-		}
-		char serial[64];
-		if (desc.iSerialNumber) {
-			int result = libusb_get_string_descriptor_ascii(
-				link->device_handle, desc.iSerialNumber, (uint8_t *)serial, sizeof(serial));
-			/* If the call fails and it's not because the device gave us STALL, continue to the next one */
-			if (result < 0 && result != LIBUSB_ERROR_PIPE) {
-				libusb_close(link->device_handle);
-				continue;
-			}
-			if (result <= 0)
-				serial[0] = '\0';
-		} else
-			serial[0] = '\0';
-		/* Likewise, if the serial number returned doesn't match the one in info, go to next */
-		if (!strstr(serial, info.serial)) {
-			libusb_close(link->device_handle);
-			continue;
-		}
-		found = true;
-		break;
-	}
-	libusb_free_device_list(devs, (int)cnt);
-	if (!found)
-		return false;
 	if (info.vid != VENDOR_ID_STLINK)
 		return true;
 	switch (info.pid) {
@@ -826,38 +777,6 @@ void stlink_adiv5_dp_defaults(adiv5_debug_port_s *dp)
 	dp->mem_write = stlink_mem_write;
 }
 
-static uint8_t stlink_ulog2(uint32_t value)
-{
-	if (unlikely(!value))
-		return UINT8_MAX;
-#if defined(__GNUC__)
-	return (uint8_t)((sizeof(uint32_t) * 8U) - (uint8_t)__builtin_clz(value));
-#elif defined(_MSC_VER)
-	return (uint8_t)((sizeof(uint32_t) * 8U) - (uint8_t)__lzcnt(value));
-#else
-	uint8_t result = 0U;
-	if (value <= UINT32_C(0x0000ffff)) {
-		result += 16;
-		value <<= 16U;
-	}
-	if (value <= UINT32_C(0x00ffffff)) {
-		result += 8;
-		value <<= 8U;
-	}
-	if (value <= UINT32_C(0x0fffffff)) {
-		result += 4;
-		value <<= 4U;
-	}
-	if (value <= UINT32_C(0x3fffffff)) {
-		result += 2;
-		value <<= 2U;
-	}
-	if (value <= UINT32_C(0x7fffffff))
-		++result;
-	return (sizeof(uint8_t) * 8U) - result;
-#endif
-}
-
 static void stlink_v2_set_frequency(const uint32_t freq)
 {
 	stlink_v2_set_freq_s request = {
@@ -881,7 +800,7 @@ static void stlink_v2_set_frequency(const uint32_t freq)
 		 * http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
 		 * For a worked example of it in action, see https://bmp.godbolt.org/z/Pqhjco8e3
 		 */
-		stlink_v2_divisor = 1U << stlink_ulog2(divisor);
+		stlink_v2_divisor = 1U << ulog2(divisor);
 		stlink_v2_divisor /= STLINK_V2_JTAG_MUL_FACTOR;
 	} else {
 		/* Adjust the clock frequency request to result in the corrector dividor */
