@@ -18,7 +18,7 @@ else
 LDFLAGS += --specs=nosys.specs
 endif
 
-VPATH += platforms/stm32
+VPATH += platforms/common/stm32
 
 SRC += \
 	traceswodecode.c	\
