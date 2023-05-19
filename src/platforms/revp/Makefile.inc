@@ -21,6 +21,7 @@ endif
 VPATH += platforms/common/stm32
 
 SRC += \
+	platform.c \
 	traceswodecode.c	\
 	traceswoasync.c	\
 	serialno.c	\
